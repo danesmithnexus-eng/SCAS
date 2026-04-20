@@ -26,10 +26,19 @@
       </button>
     </div>
 
-    <!-- LoginForm -->
-    <LoginForm v-if="selectedRole" v-model:studentId="studentId" v-model:purpose="purpose" :role="selectedRole"
-      :logged-in="loggedIn" :loading="loading" :error-msg="errorMsg" @clear-error="errorMsg = ''" @submit="handleLogin"
-      @logout="handleLogout" />
+    <!-- Login Form -->
+    <LoginForm
+      v-if="selectedRole"
+      v-model:studentId="studentId"
+      v-model:purpose="purpose"
+      :role="selectedRole"
+      :logged-in="loggedIn"
+      :loading="loading"
+      :error-msg="errorMsg"
+      @clear-error="errorMsg = ''"
+      @submit="handleLogin"
+      @logout="handleLogout"
+    />
 
     <!-- Welcome message after login -->
     <transition name="banner">
@@ -38,7 +47,7 @@
       </div>
     </transition>
 
-    <!-- ── Shut Down Shows afte Sign Out ── -->
+    <!-- Shut Down button — shown when not logged in -->
     <transition name="fade-up">
       <div class="shutdown-zone" v-if="showShutdown">
         <button class="btn-shut-down" @click="handleShutDown" :disabled="shuttingDown">
@@ -58,17 +67,18 @@
 <script>
 import LoginForm from './components/LoginForm.vue'
 
-const PC_NUMBER = '01'
+const PC_NUMBER    = '01'
 const EMAIL_DOMAIN = '@bma.edu.ph'
 
 /* backend */
-const SHUTDOWN_API = 'http://localhost:3001/shutdown'
+const SHUTDOWN_API      = 'http://localhost:3001/shutdown'
+const SESSION_START_API = 'http://localhost:3001/start-session'
 
-const LOG_API = 'URL_TO_LOG_API_ENDPOINT' // <-- REPLACE with your API endpoint for logging
+const LOG_API = 'URL_TO_LOG_API_ENDPOINT' // ← replace with your actual logging endpoint
 
 const REGISTERED_IDS = {
   applicant: ['APP-2026-0001', 'APP-2026-0002', 'APP-2026-0003'],
-  student: ['23132.cruz', '24004.jimenez', '12345.rivera', 'STU-2026-0001'],
+  student:   ['23132.cruz', '24004.jimenez', '12345.rivera', 'STU-2026-0001'],
 }
 
 export default {
@@ -78,23 +88,23 @@ export default {
   data() {
     return {
       selectedRole: null,
-      studentId: '',
-      username: '',
-      purpose: '',
-      loggedIn: false,
-      loading: false,
-      errorMsg: '',
-      currentYear: new Date().getFullYear(),
-      logs: [],
+      studentId:    '',
+      username:     '',
+      purpose:      '',
+      loggedIn:     false,
+      loading:      false,
+      errorMsg:     '',
+      currentYear:  new Date().getFullYear(),
+      logs:         [],
 
-      showShutdown: false,   
-      shuttingDown: false,   
+      showShutdown: true,
+      shuttingDown: false,
     }
   },
 
   mounted() {
     this.focusInput()
-    this.focuTimer = setInterval(this.focusInput, 5000)
+    this.focusTimer = setInterval(this.focusInput, 5000)
 
     const savedLogs = localStorage.getItem('bma_logs')
     if (savedLogs) {
@@ -103,7 +113,7 @@ export default {
   },
 
   beforeUnmount() {
-    clearInterval(this.focuTimer)
+    clearInterval(this.focusTimer)
   },
 
   methods: {
@@ -130,10 +140,10 @@ export default {
       const entry = {
         pcNumber: PC_NUMBER,
         username,
-        purpose: this.purpose || '—',
-        timeIn: this.now(),
-        date: this.today(),
-        status: status || 'UNKNOWN',
+        purpose:  this.purpose || '—',
+        timeIn:   this.now(),
+        date:     this.today(),
+        status:   status || 'UNKNOWN',
       }
       this.logs.push(entry)
       localStorage.setItem('bma_logs', JSON.stringify(this.logs))
@@ -143,22 +153,22 @@ export default {
     selectRole(role) {
       if (this.loggedIn) return
       this.selectedRole = role
-      this.studentId = ''
-      this.username = ''
-      this.purpose = ''
-      this.errorMsg = ''
-      this.showShutdown = true   
+      this.studentId    = ''
+      this.username     = ''
+      this.purpose      = ''
+      this.errorMsg     = ''
+      this.showShutdown = true
     },
 
     async handleLogin() {
       if (this.loggedIn) return
-      this.errorMsg = ''
+      this.errorMsg     = ''
       this.showShutdown = false
 
       const cleaned = this.cleanUsername(this.studentId)
 
-      if (!cleaned) { this.errorMsg = 'Please enter your username.'; return }
-      if (!this.purpose) { this.errorMsg = 'Please select a purpose.'; return }
+      if (!cleaned)       { this.errorMsg = 'Please enter your username.'; return }
+      if (!this.purpose)  { this.errorMsg = 'Please select a purpose.';    return }
 
       this.loading = true
       await new Promise(r => setTimeout(r, 800))
@@ -166,25 +176,28 @@ export default {
       const validIds = REGISTERED_IDS[this.selectedRole] || []
 
       if (validIds.includes(cleaned)) {
-        this.username = cleaned
+        this.username  = cleaned
         this.studentId = cleaned
-        this.loggedIn = true
+        this.loggedIn  = true
 
         const entry = this.addLog('SUCCESS', cleaned)
 
+        // Send log to API
         try {
           await fetch(LOG_API, {
-            method: 'POST',
+            method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(entry),
+            body:    JSON.stringify(entry),
           })
-        } catch (err) {
-          console.warn('Offline — entry not sent to API.')
+        } catch {
+          console.warn('Offline — log entry not sent to API.')
         }
-        if (window.electronAPI?.minimize) {
-          window.electronAPI.minimize()
-        } else {
-          window.blur()
+
+        // Tell the server to kill Openbox and launch LXQt
+        try {
+          await fetch(SESSION_START_API, { method: 'POST' })
+        } catch {
+          console.error('Could not reach shutdown-server to start session.')
         }
 
       } else {
@@ -198,28 +211,28 @@ export default {
     async handleLogout() {
       const entry = this.addLog('LOGOUT', this.username)
 
-      this.loggedIn = false
-      this.studentId = ''
-      this.username = ''
-      this.purpose = ''
-      this.errorMsg = ''
-
+      this.loggedIn     = false
+      this.studentId    = ''
+      this.username     = ''
+      this.purpose      = ''
+      this.errorMsg     = ''
       this.showShutdown = true
 
       try {
         await fetch(LOG_API, {
-          method: 'POST',
+          method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(entry),
+          body:    JSON.stringify(entry),
         })
-      } catch (e) { /* offline */ }
+      } catch { /* offline */ }
     },
 
     async handleShutDown() {
+      if (!confirm('Are you sure you want to shut down the computer?')) return
       this.shuttingDown = true
       try {
         await fetch(SHUTDOWN_API, { method: 'POST' })
-      } catch (e) {
+      } catch {
         console.info('Shutdown signal sent.')
       }
     },
@@ -273,7 +286,7 @@ body {
   overflow: hidden;
 }
 
-.app-wrapper>* {
+.app-wrapper > * {
   position: relative;
   z-index: 1;
 }
@@ -383,7 +396,7 @@ body {
   transition: background 0.2s, border-color 0.2s;
 }
 
-.btn-shut-down:hover { background: #c1270b; border-color: #c1270b; }
+.btn-shut-down:hover    { background: #c1270b; border-color: #c1270b; }
 .btn-shut-down:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ── Welcome Banner ── */
@@ -405,12 +418,12 @@ body {
 .banner-enter-active { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 .banner-leave-active { transition: all 0.2s ease; }
 .banner-enter-from,
-.banner-leave-to { opacity: 0; transform: translateY(-10px); }
+.banner-leave-to     { opacity: 0; transform: translateY(-10px); }
 
 .fade-up-enter-active { transition: all 0.45s cubic-bezier(0.16, 1, 0.3, 1); }
 .fade-up-leave-active { transition: all 0.2s ease; }
 .fade-up-enter-from,
-.fade-up-leave-to { opacity: 0; transform: translateY(12px); }
+.fade-up-leave-to     { opacity: 0; transform: translateY(12px); }
 
 /* ── Footer ── */
 .app-footer {
