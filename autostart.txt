@@ -1,0 +1,5 @@
+bash ~/session-watcher.sh &
+sleep 5
+if ! pgrep -x lxqt-session > /dev/null; then
+  firefox --kiosk --no-remote http://localhost &
+fi

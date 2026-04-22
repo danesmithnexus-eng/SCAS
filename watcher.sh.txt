@@ -1,0 +1,9 @@
+#!/bin/bash
+TRIGGER="/tmp/start-lxqt-trigger"
+while true; do
+  if [ -f "$TRIGGER" ]; then
+    rm -f "$TRIGGER"
+    bash ~/switch-to-lxqt.sh
+  fi
+  sleep 1
+done

@@ -1,0 +1,9 @@
+#!/bin/bash
+export DISPLAY=:0
+export XDG_RUNTIME_DIR=/run/user/$(id -u)
+pkill -9 -f lxqt-session
+pkill -9 -f startlxqt
+sleep 2
+openbox &
+sleep 4
+firefox --kiosk --no-remote http://localhost &

@@ -1,0 +1,4 @@
+#!/bin/bash
+if [ "$1" = "lock" ]; then
+  curl -s -X POST http://localhost:3001/lock-session
+fi
