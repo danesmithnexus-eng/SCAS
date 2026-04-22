@@ -1,0 +1,7 @@
+for profile in ~/.mozilla/firefox/*.default*; do
+  if [ -d "$profile" ]; then
+    echo 'user_pref("browser.sessionstore.enabled", false);
+user_pref("browser.sessionstore.resume_from_crash", false);
+user_pref("browser.sessionstore.resume_session_once", false);' >> "$profile/user.js"
+  fi
+done
